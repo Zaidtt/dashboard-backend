@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard de Análisis de Dataset</title>
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.8.1/core.css">
+    <script type="module" src="https://pyscript.net/releases/2024.8.1/core.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
+        .chart { border: 1px solid #ccc; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Dashboard de Visualización de Dataset</h1>
+    <input type="file" id="upload-file">
+    <button id="upload-btn">Subir Nuevo Dataset</button>
+    <div class="dashboard" id="charts"></div>
+
+    <py-config>
+        packages = ["pandas", "matplotlib", "plotly", "requests"]
+    </py-config>
+
+    <py-script>
+import asyncio
+import js
+import pandas as pd
+import matplotlib.pyplot as plt
+import plotly.express as px
+import requests
+from pyodide.http import pyfetch
+from pyscript import display, Element
+
+API_URL = "http://127.0.0.1:8000/data/"  # Cambia a la URL de Heroku después
+UPLOAD_URL = "http://127.0.0.1:8000/upload/"
+
+async def fetch_data():
+    response = await pyfetch(API_URL)
+    if response.status == 200:
+        data = await response.json()
+        return data
+    return None
+
+async def upload_file(event):
+    file_input = js.document.getElementById("upload-file")
+    if file_input.files.length > 0:
+        file = file_input.files[0]
+        form_data = js.FormData.new()
+        form_data.append("file", file)
+        response = await pyfetch(UPLOAD_URL, method="POST", body=form_data)
+        if response.status == 200:
+            await render_charts()
+            js.alert("Dataset actualizado!")
+
+async def render_charts():
+    data = await fetch_data()
+    if data:
+        df = pd.DataFrame(data['data'])
+        
+        # Gráfico 1: Valores nulos por columna (barras)
+        nulls = pd.Series(data['nulls'])
+        fig_nulls = px.bar(nulls, title="Valores Nulos por Columna")
+        display(fig_nulls, target="charts")
+        
+        # Gráfico 2: Duplicados (simple texto/gráfico)
+        dup_fig = px.pie(names=['Únicos', 'Duplicados'], values=[len(df) - data['duplicates'], data['duplicates']], title="Proporción de Duplicados")
+        display(dup_fig, target="charts")
+        
+        # Gráfico 3: Distribución (boxplot para columnas numéricas)
+        num_cols = df.select_dtypes(include='number').columns
+        if len(num_cols) > 0:
+            fig_box = px.box(df, y=num_cols, title="Distribución y Outliers")
+            display(fig_box, target="charts")
+        
+        # Gráfico 4: Histograma general (ej. primera columna numérica)
+        if len(num_cols) > 0:
+            fig_hist = px.histogram(df, x=num_cols[0], title="Histograma de Datos (Ejemplo Columna)")
+            display(fig_hist, target="charts")
+
+# Evento para upload
+upload_btn = Element("upload-btn")
+upload_btn.element.onclick = upload_file
+
+# Render inicial
+asyncio.ensure_future(render_charts())
+    </py-script>
+</body>
+</html>

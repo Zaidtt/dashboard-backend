@@ -17,18 +17,23 @@ class IndexView(View):
         return render(request, "index.html")
 
 # API para obtener los datos
+
 def data_api(request):
-    datasets = Dataset.objects.all().order_by('-id')
-    if datasets.exists():
-        dataset = datasets.first()
-        return JsonResponse({
-            "data": dataset.data,
-            "duplicates": pd.DataFrame(dataset.data).duplicated().sum(),
-            "nulls": pd.DataFrame(dataset.data).isnull().sum().to_dict()
-        })
-    return JsonResponse({"error": "No data"})
+    try:
+        latest_dataset = Dataset.objects.latest("id")
+        df = pd.DataFrame(latest_dataset.data)
+
+        response = {
+            "data": df.to_dict(orient="records"),
+            "nulls": df.isnull().sum().to_dict(),
+            "duplicates": df.duplicated().sum()
+        }
+        return JsonResponse(response)
+    except Dataset.DoesNotExist:
+        return JsonResponse({"error": "No data"}, status=404)
 
 # API para subir CSV
+@csrf_exempt
 def upload_api(request):
     if request.method == "POST" and request.FILES.get("file"):
         file = request.FILES["file"]

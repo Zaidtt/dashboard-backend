@@ -5,7 +5,6 @@
     <title>Dashboard de Análisis de Dataset</title>
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.8.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.8.1/core.js"></script>
-    <!-- Usa una versión más reciente y compatible de Plotly -->
     <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
@@ -20,7 +19,7 @@
     <div class="dashboard" id="charts"></div>
 
     <py-config>
-        packages = ["pandas", "matplotlib", "requests", "micropip"]
+        packages = ["pandas", "matplotlib", "requests", "micropip", "pyarrow"]  <!-- Added pyarrow -->
     </py-config>
 
     <py-script>
@@ -33,7 +32,7 @@ from pyscript import display
 
 # Función async para instalar dependencias e importar plotly.express
 async def install_dependencies():
-    await micropip.install('plotly==5.22.0')  # Asegúrate de que coincida con la versión de JavaScript
+    await micropip.install('plotly==5.22.0')
     import plotly.express as px
     globals()['px'] = px  # Hacer px disponible globalmente
 

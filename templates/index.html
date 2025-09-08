@@ -18,27 +18,25 @@
     <div class="dashboard" id="charts"></div>
 
     <py-config>
-        packages = ["pandas", "matplotlib", "plotly", "requests"]
+        packages = ["pandas", "matplotlib", "plotly", "requests", "pyarrow"]
     </py-config>
 
     <py-script>
 import asyncio
 import js
 import pandas as pd
-import matplotlib.pyplot as plt
 import plotly.express as px
-import requests
 from pyodide.http import pyfetch
-from pyscript import display, Element
+from pyscript import display
 
-API_URL = "http://127.0.0.1:8000/data/"  # Cambia a la URL de Heroku después
-UPLOAD_URL = "http://127.0.0.1:8000/upload/"
+# Cambia a tu backend en Render
+API_URL = "https://dashboard-api-g88c.onrender.com/data/"
+UPLOAD_URL = "https://dashboard-api-g88c.onrender.com/upload/"
 
 async def fetch_data():
     response = await pyfetch(API_URL)
     if response.status == 200:
-        data = await response.json()
-        return data
+        return await response.json()
     return None
 
 async def upload_file(event):
@@ -57,29 +55,32 @@ async def render_charts():
     if data:
         df = pd.DataFrame(data['data'])
         
-        # Gráfico 1: Valores nulos por columna (barras)
+        # Gráfico 1: Valores nulos por columna
         nulls = pd.Series(data['nulls'])
         fig_nulls = px.bar(nulls, title="Valores Nulos por Columna")
         display(fig_nulls, target="charts")
         
-        # Gráfico 2: Duplicados (simple texto/gráfico)
-        dup_fig = px.pie(names=['Únicos', 'Duplicados'], values=[len(df) - data['duplicates'], data['duplicates']], title="Proporción de Duplicados")
+        # Gráfico 2: Duplicados
+        dup_fig = px.pie(
+            names=['Únicos', 'Duplicados'], 
+            values=[len(df) - data['duplicates'], data['duplicates']], 
+            title="Proporción de Duplicados"
+        )
         display(dup_fig, target="charts")
         
-        # Gráfico 3: Distribución (boxplot para columnas numéricas)
+        # Gráfico 3: Boxplot columnas numéricas
         num_cols = df.select_dtypes(include='number').columns
         if len(num_cols) > 0:
             fig_box = px.box(df, y=num_cols, title="Distribución y Outliers")
             display(fig_box, target="charts")
         
-        # Gráfico 4: Histograma general (ej. primera columna numérica)
+        # Gráfico 4: Histograma primera columna numérica
         if len(num_cols) > 0:
             fig_hist = px.histogram(df, x=num_cols[0], title="Histograma de Datos (Ejemplo Columna)")
             display(fig_hist, target="charts")
 
-# Evento para upload
-upload_btn = Element("upload-btn")
-upload_btn.element.onclick = upload_file
+# Asignar evento de subida
+js.document.getElementById("upload-btn").onclick = lambda e: asyncio.ensure_future(upload_file(e))
 
 # Render inicial
 asyncio.ensure_future(render_charts())

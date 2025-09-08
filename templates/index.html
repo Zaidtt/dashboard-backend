@@ -7,7 +7,11 @@
     <script type="module" src="https://pyscript.net/releases/2024.8.1/core.js"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
-        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
+        .dashboard { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); 
+            gap: 20px; 
+        }
         .chart { border: 1px solid #ccc; padding: 10px; }
     </style>
 </head>
@@ -18,7 +22,7 @@
     <div class="dashboard" id="charts"></div>
 
     <py-config>
-        packages = [ "matplotlib", "plotly", "requests"]
+        packages = ["pandas", "matplotlib", "plotly", "requests"]
     </py-config>
 
     <py-script>
@@ -29,7 +33,7 @@ import plotly.express as px
 from pyodide.http import pyfetch
 from pyscript import display
 
-# Cambia a tu backend en Render
+# URLs del backend en Render
 API_URL = "https://dashboard-api-g88c.onrender.com/data/"
 UPLOAD_URL = "https://dashboard-api-g88c.onrender.com/upload/"
 
@@ -53,7 +57,6 @@ async def upload_file(event):
 async def render_charts():
     data = await fetch_data()
     if data:
-        
         charts_div = js.document.getElementById("charts")
         charts_div.innerHTML = ""
         
@@ -83,7 +86,7 @@ async def render_charts():
             fig_hist = px.histogram(df, x=num_cols[0], title="Histograma de Datos (Ejemplo Columna)")
             display(fig_hist, target="charts")
 
-# Asignar evento de subida
+# Evento subir archivo
 js.document.getElementById("upload-btn").onclick = lambda e: asyncio.ensure_future(upload_file(e))
 
 # Render inicial

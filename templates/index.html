@@ -27,7 +27,7 @@
         packages = ["pandas", "matplotlib", "requests", "micropip"]
     </py-config>
 
-    <py-script>
+<py-script>
 import asyncio
 import js
 import pandas as pd
@@ -35,19 +35,20 @@ import micropip
 from pyodide.http import pyfetch
 from pyscript import display
 
-# Función async para instalar dependencias
+# Función async para instalar dependencias e importar plotly.express
 async def install_dependencies():
-    await micropip.install('plotly==5.22.0')  # Compatible con Plotly.js 2.34.0
-    await micropip.install('pyarrow')  # Para suprimir advertencia de Pandas
+    await micropip.install('plotly==5.22.0')
     import plotly.express as px
     globals()['px'] = px  # Hacer px disponible globalmente
 
-# Ejecutar instalación de dependencias al inicio
-asyncio.ensure_future(install_dependencies())
+# Función para inicializar la app
+async def initialize_app():
+    await install_dependencies()  # Espera a que se instalen las dependencias
+    await render_charts()  # Renderiza los gráficos después de la instalación
 
-# URLs del backend en Render
-API_URL = "/data/"  # Ruta relativa, ya que está en el mismo dominio
-UPLOAD_URL = "/upload/"  # Ruta relativa, ya que está en el mismo dominio
+# URLs del backend
+API_URL = "/data/"
+UPLOAD_URL = "/upload/"
 
 async def fetch_data():
     response = await pyfetch(API_URL)
@@ -67,42 +68,42 @@ async def upload_file(event):
             js.alert("Dataset actualizado!")
 
 async def render_charts():
-    data = await fetch_data()
-    if data:
-        charts_div = js.document.getElementById("charts")
-        charts_div.innerHTML = ""
-        
-        df = pd.DataFrame(data['data'])
-        
-        # Gráfico 1: Valores nulos por columna
-        nulls = pd.Series(data['nulls'])
-        fig_nulls = px.bar(x=nulls.index, y=nulls.values, title="Valores Nulos por Columna")
-        display(fig_nulls, target="charts")
-        
-        # Gráfico 2: Duplicados
-        dup_fig = px.pie(
-            names=['Únicos', 'Duplicados'], 
-            values=[len(df) - data['duplicates'], data['duplicates']], 
-            title="Proporción de Duplicados"
-        )
-        display(dup_fig, target="charts")
-        
-        # Gráfico 3: Boxplot columnas numéricas
-        num_cols = df.select_dtypes(include='number').columns
-        if len(num_cols) > 0:
-            fig_box = px.box(df, y=num_cols, title="Distribución y Outliers")
-            display(fig_box, target="charts")
-        
-        # Gráfico 4: Histograma primera columna numérica
-        if len(num_cols) > 0:
-            fig_hist = px.histogram(df, x=num_cols[0], title=f"Histograma de {num_cols[0]}")
-            display(fig_hist, target="charts")
+    try:
+        data = await fetch_data()
+        if data:
+            charts_div = js.document.getElementById("charts")
+            charts_div.innerHTML = ""
+            df = pd.DataFrame(data['data'])
+            
+            # Gráfico 1: Valores nulos por columna
+            nulls = pd.Series(data['nulls'])
+            fig_nulls = px.bar(x=nulls.index, y=nulls.values, title="Valores Nulos por Columna")
+            display(fig_nulls, target="charts")
+            
+            # Gráfico 2: Duplicados
+            dup_fig = px.pie(
+                names=['Únicos', 'Duplicados'], 
+                values=[len(df) - data['duplicates'], data['duplicates']], 
+                title="Proporción de Duplicados"
+            )
+            display(dup_fig, target="charts")
+            
+            # Gráfico 3: Boxplot columnas numéricas
+            num_cols = df.select_dtypes(include='number').columns
+            if len(num_cols) > 0:
+                fig_box = px.box(df, y=num_cols, title="Distribución y Outliers")
+                display(fig_box, target="charts")
+            
+            # Gráfico 4: Histograma primera columna numérica
+            if len(num_cols) > 0:
+                fig_hist = px.histogram(df, x=num_cols[0], title=f"Histograma de {num_cols[0]}")
+                display(fig_hist, target="charts")
+    except Exception as e:
+        js.alert(f"Error: {str(e)}")
 
 # Evento subir archivo
 js.document.getElementById("upload-btn").onclick = lambda e: asyncio.ensure_future(upload_file(e))
 
-# Render inicial
-asyncio.ensure_future(render_charts())
-    </py-script>
-</body>
-</html>
+# Iniciar la app
+asyncio.ensure_future(initialize_app())
+</py-script>

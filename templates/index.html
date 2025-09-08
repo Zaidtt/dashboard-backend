@@ -18,7 +18,7 @@
     <div class="dashboard" id="charts"></div>
 
     <py-config>
-        packages = ["pandas", "matplotlib", "plotly", "requests", "pyarrow"]
+        packages = ["pandas", "matplotlib", "plotly", "requests"]
     </py-config>
 
     <py-script>
@@ -53,6 +53,10 @@ async def upload_file(event):
 async def render_charts():
     data = await fetch_data()
     if data:
+        
+        charts_div = js.document.getElementById("charts")
+        charts_div.innerHTML = ""
+        
         df = pd.DataFrame(data['data'])
         
         # Gráfico 1: Valores nulos por columna

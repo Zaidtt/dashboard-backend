@@ -88,13 +88,14 @@ async def render_charts():
             )
             display(dup_fig, target="charts")
             
-            # Gráfico 3: Boxplot columnas numéricas
+            # Gráfico 3: Boxplot para cada columna numérica
             num_cols = df.select_dtypes(include='number').columns
             if len(num_cols) > 0:
-                fig_box = px.box(df, y=num_cols, title="Distribución y Outliers")
-                display(fig_box, target="charts")
+                for col in num_cols:
+                    fig_box = px.box(df, y=col, title=f"Boxplot de {col}")
+                    display(fig_box, target="charts")
             
-            # Gráfico 4: Histograma primera columna numérica
+            # Gráfico 4: Histograma de la primera columna numérica
             if len(num_cols) > 0:
                 fig_hist = px.histogram(df, x=num_cols[0], title=f"Histograma de {num_cols[0]}")
                 display(fig_hist, target="charts")

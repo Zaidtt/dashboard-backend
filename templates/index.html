@@ -19,7 +19,7 @@
     <div class="dashboard" id="charts"></div>
 
     <py-config>
-        packages = ["pandas", "matplotlib", "requests", "micropip", "pyarrow"]  <!-- Added pyarrow -->
+        packages = ["pandas", "matplotlib", "requests", "micropip"]  <!-- Removido "pyarrow" para evitar el error -->
     </py-config>
 
     <py-script>
@@ -32,7 +32,7 @@ from pyscript import display
 
 # Función async para instalar dependencias e importar plotly.express
 async def install_dependencies():
-    await micropip.install('plotly==5.22.0')
+    await micropip.install('plotly==5.22.0')  <!-- Solo plotly, sin pyarrow -->
     import plotly.express as px
     globals()['px'] = px  # Hacer px disponible globalmente
 

@@ -22,7 +22,6 @@ def data_api(request):
     try:
         latest_dataset = Dataset.objects.latest("id")
         df = pd.DataFrame(latest_dataset.data)
-
         response = {
             "data": df.to_dict(orient="records"),
             "nulls": df.isnull().sum().to_dict(),
@@ -30,7 +29,9 @@ def data_api(request):
         }
         return JsonResponse(response)
     except Dataset.DoesNotExist:
-        return JsonResponse({"error": "No data"}, status=404)
+        # Devuelve estructura vacía para que PyScript no rompa
+        return JsonResponse({"data": [], "nulls": {}, "duplicates": 0})
+
 
 # API para subir CSV
 @csrf_exempt

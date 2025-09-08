@@ -18,9 +18,11 @@ from django.contrib import admin
 from django.urls import path
 from django.urls import path
 from api.views import DataAPI, UploadAPI
+from api.views import index  
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('data/', DataAPI.as_view()),
     path('upload/', UploadAPI.as_view()),
+    path('', index),
 ]

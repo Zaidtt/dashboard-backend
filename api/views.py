@@ -4,7 +4,11 @@ from rest_framework.response import Response
 from django.db import connection
 import pandas as pd
 import json
+
 # Create your views here.
+
+def index(request):
+    return render(request, "index.html")
 
 
 class DataAPI(APIView):

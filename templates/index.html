@@ -5,6 +5,8 @@
     <title>Dashboard de Análisis de Dataset</title>
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.8.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.8.1/core.js"></script>
+    <!-- Usa una versión específica de Plotly.js compatible -->
+    <script src="https://cdn.plot.ly/plotly-2.34.0.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
         .dashboard { 
@@ -22,16 +24,21 @@
     <div class="dashboard" id="charts"></div>
 
     <py-config>
-        packages = ["pandas", "matplotlib", "plotly", "requests"]
+        packages = ["pandas", "matplotlib", "requests", "micropip"]
     </py-config>
 
     <py-script>
 import asyncio
 import js
 import pandas as pd
-import plotly.express as px
+import micropip
 from pyodide.http import pyfetch
 from pyscript import display
+
+# Instalar plotly y pyarrow explícitamente
+await micropip.install('plotly==5.22.0')  # Versión compatible con Plotly.js 2.34.0
+await micropip.install('pyarrow')  # Para suprimir advertencia de Pandas
+import plotly.express as px
 
 # URLs del backend en Render
 API_URL = "https://dashboard-api-g88c.onrender.com/data/"
@@ -64,7 +71,7 @@ async def render_charts():
         
         # Gráfico 1: Valores nulos por columna
         nulls = pd.Series(data['nulls'])
-        fig_nulls = px.bar(nulls, title="Valores Nulos por Columna")
+        fig_nulls = px.bar(x=nulls.index, y=nulls.values, title="Valores Nulos por Columna")
         display(fig_nulls, target="charts")
         
         # Gráfico 2: Duplicados
@@ -83,7 +90,7 @@ async def render_charts():
         
         # Gráfico 4: Histograma primera columna numérica
         if len(num_cols) > 0:
-            fig_hist = px.histogram(df, x=num_cols[0], title="Histograma de Datos (Ejemplo Columna)")
+            fig_hist = px.histogram(df, x=num_cols[0], title=f"Histograma de {num_cols[0]}")
             display(fig_hist, target="charts")
 
 # Evento subir archivo

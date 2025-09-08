@@ -1,0 +1,11 @@
+import asyncio
+import micropip
+
+async def instalar_paquetes():
+    await micropip.install("pandas")
+    try:
+        await micropip.install("pyarrow")
+    except Exception as e:
+        print("No se pudo instalar pyarrow, se ignora:", e)
+
+asyncio.run(instalar_paquetes())

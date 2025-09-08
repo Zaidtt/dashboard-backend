@@ -5,13 +5,11 @@
     <title>Dashboard de Análisis de Dataset</title>
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.8.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.8.1/core.js"></script>
+    <!-- Usa una versión más reciente y compatible de Plotly -->
+    <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
-        .dashboard { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); 
-            gap: 20px; 
-        }
+        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
         .chart { border: 1px solid #ccc; padding: 10px; }
     </style>
 </head>
@@ -22,10 +20,10 @@
     <div class="dashboard" id="charts"></div>
 
     <py-config>
-        packages = ["pandas", "matplotlib", "micropip"]
+        packages = ["pandas", "matplotlib", "requests", "micropip"]
     </py-config>
 
-<py-script>
+    <py-script>
 import asyncio
 import js
 import pandas as pd
@@ -33,20 +31,18 @@ import micropip
 from pyodide.http import pyfetch
 from pyscript import display
 
-# Función async para instalar Plotly
-async def install_plotly():
-    try:
-        await micropip.install("plotly==5.22.0")
-        import plotly.express as px
-        globals()['px'] = px
-    except Exception as e:
-        js.console.warn(f"No se pudo instalar Plotly: {e}")
+# Función async para instalar dependencias e importar plotly.express
+async def install_dependencies():
+    await micropip.install('plotly==5.22.0')  # Asegúrate de que coincida con la versión de JavaScript
+    import plotly.express as px
+    globals()['px'] = px  # Hacer px disponible globalmente
 
-# Inicializar app
+# Función para inicializar la app
 async def initialize_app():
-    await install_plotly()
-    await render_charts()
+    await install_dependencies()  # Espera a que se instalen las dependencias
+    await render_charts()  # Renderiza los gráficos después de la instalación
 
+# URLs del backend
 API_URL = "/data/"
 UPLOAD_URL = "/upload/"
 
@@ -76,51 +72,37 @@ async def render_charts():
             df = pd.DataFrame(data['data'])
             
             # Gráfico 1: Valores nulos por columna
-            try:
-                nulls = pd.Series(data['nulls'])
-                fig_nulls = px.bar(
-                    x=list(nulls.index),
-                    y=list(nulls.values),
-                    title="Valores Nulos por Columna"
-                )
-                display(fig_nulls, target="charts")
-            except Exception as e:
-                js.console.warn(f"Error gráfico nulos: {e}")
+            nulls = pd.Series(data['nulls'])
+            fig_nulls = px.bar(x=nulls.index, y=nulls.values, title="Valores Nulos por Columna")
+            display(fig_nulls, target="charts")
             
             # Gráfico 2: Duplicados
-            try:
-                dup_fig = px.pie(
-                    names=['Únicos', 'Duplicados'], 
-                    values=[len(df) - data['duplicates'], data['duplicates']], 
-                    title="Proporción de Duplicados"
-                )
-                display(dup_fig, target="charts")
-            except Exception as e:
-                js.console.warn(f"Error gráfico duplicados: {e}")
+            dup_fig = px.pie(
+                names=['Únicos', 'Duplicados'], 
+                values=[len(df) - data['duplicates'], data['duplicates']], 
+                title="Proporción de Duplicados"
+            )
+            display(dup_fig, target="charts")
             
-            # Gráfico 3: Boxplots columnas numéricas
+            # Gráfico 3: Boxplot para cada columna numérica
             num_cols = df.select_dtypes(include='number').columns
-            for col in num_cols:
-                try:
+            if len(num_cols) > 0:
+                for col in num_cols:
                     fig_box = px.box(df, y=col, title=f"Boxplot de {col}")
                     display(fig_box, target="charts")
-                except Exception as e:
-                    js.console.warn(f"Error boxplot {col}: {e}")
             
-            # Gráfico 4: Histograma primera columna numérica
+            # Gráfico 4: Histograma de la primera columna numérica
             if len(num_cols) > 0:
-                try:
-                    fig_hist = px.histogram(df, x=num_cols[0], title=f"Histograma de {num_cols[0]}")
-                    display(fig_hist, target="charts")
-                except Exception as e:
-                    js.console.warn(f"Error histograma {num_cols[0]}: {e}")
+                fig_hist = px.histogram(df, x=num_cols[0], title=f"Histograma de {num_cols[0]}")
+                display(fig_hist, target="charts")
     except Exception as e:
-        js.console.error(f"Error render_charts: {e}")
+        js.alert(f"Error: {str(e)}")
 
-# Eventos
+# Evento subir archivo
 js.document.getElementById("upload-btn").onclick = lambda e: asyncio.ensure_future(upload_file(e))
-asyncio.ensure_future(initialize_app())
-</py-script>
 
+# Iniciar la app
+asyncio.ensure_future(initialize_app())
+    </py-script>
 </body>
 </html>

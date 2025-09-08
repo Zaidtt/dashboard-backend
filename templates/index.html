@@ -5,7 +5,6 @@
     <title>Dashboard de Análisis de Dataset</title>
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.8.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.8.1/core.js"></script>
-    <!-- Versión específica de Plotly.js compatible con plotly==5.22.0 -->
     <script src="https://cdn.plot.ly/plotly-2.34.0.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
@@ -24,7 +23,7 @@
     <div class="dashboard" id="charts"></div>
 
     <py-config>
-        packages = ["pandas", "matplotlib", "requests", "micropip"]
+        packages = ["pandas", "micropip"]
     </py-config>
 
 <py-script>
@@ -33,20 +32,20 @@ import js
 import pandas as pd
 import micropip
 from pyodide.http import pyfetch
-from pyscript import display
+import plotly.express as px
+import plotly.io as pio
 
-# Función async para instalar dependencias e importar plotly.express
+# Función async para instalar dependencias
 async def install_dependencies():
-    await micropip.install('plotly==5.22.0')
-    import plotly.express as px
-    globals()['px'] = px  # Hacer px disponible globalmente
+    try:
+        await micropip.install('plotly==5.22.0')
+    except Exception as e:
+        print("No se pudo instalar Plotly, se ignora:", e)
 
-# Función para inicializar la app
 async def initialize_app():
-    await install_dependencies()  # Espera a que se instalen las dependencias
-    await render_charts()  # Renderiza los gráficos después de la instalación
+    await install_dependencies()
+    await render_charts()
 
-# URLs del backend
 API_URL = "/data/"
 UPLOAD_URL = "/upload/"
 
@@ -75,36 +74,47 @@ async def render_charts():
             charts_div.innerHTML = ""
             df = pd.DataFrame(data['data'])
             
-            # Gráfico 1: Valores nulos por columna
+            # Valores nulos por columna
             nulls = pd.Series(data['nulls'])
             fig_nulls = px.bar(x=nulls.index, y=nulls.values, title="Valores Nulos por Columna")
-            display(fig_nulls, target="charts")
+            div_nulls = js.document.createElement("div")
+            div_nulls.className = "chart"
+            div_nulls.innerHTML = pio.to_html(fig_nulls, full_html=False)
+            charts_div.appendChild(div_nulls)
             
-            # Gráfico 2: Duplicados
+            # Proporción de duplicados
             dup_fig = px.pie(
                 names=['Únicos', 'Duplicados'], 
                 values=[len(df) - data['duplicates'], data['duplicates']], 
                 title="Proporción de Duplicados"
             )
-            display(dup_fig, target="charts")
+            div_dup = js.document.createElement("div")
+            div_dup.className = "chart"
+            div_dup.innerHTML = pio.to_html(dup_fig, full_html=False)
+            charts_div.appendChild(div_dup)
             
-            # Gráfico 3: Boxplot para cada columna numérica
+            # Boxplot por columna numérica
             num_cols = df.select_dtypes(include='number').columns
-            if len(num_cols) > 0:
-                for col in num_cols:
-                    fig_box = px.box(df, y=col, title=f"Boxplot de {col}")
-                    display(fig_box, target="charts")
+            for col in num_cols:
+                fig_box = px.box(df, y=col, title=f"Boxplot de {col}")
+                div_box = js.document.createElement("div")
+                div_box.className = "chart"
+                div_box.innerHTML = pio.to_html(fig_box, full_html=False)
+                charts_div.appendChild(div_box)
             
-            # Gráfico 4: Histograma de la primera columna numérica
+            # Histograma de la primera columna numérica
             if len(num_cols) > 0:
                 fig_hist = px.histogram(df, x=num_cols[0], title=f"Histograma de {num_cols[0]}")
-                display(fig_hist, target="charts")
+                div_hist = js.document.createElement("div")
+                div_hist.className = "chart"
+                div_hist.innerHTML = pio.to_html(fig_hist, full_html=False)
+                charts_div.appendChild(div_hist)
     except Exception as e:
         js.alert(f"Error: {str(e)}")
 
-# Evento subir archivo
 js.document.getElementById("upload-btn").onclick = lambda e: asyncio.ensure_future(upload_file(e))
 
-# Iniciar la app
 asyncio.ensure_future(initialize_app())
 </py-script>
+</body>
+</html>

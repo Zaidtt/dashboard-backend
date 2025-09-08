@@ -22,7 +22,7 @@
     <div class="dashboard" id="charts"></div>
 
     <py-config>
-        packages = ["pandas", "matplotlib", "micropip", "requests"]
+        packages = ["pandas", "matplotlib", "micropip"]
     </py-config>
 
 <py-script>
@@ -33,102 +33,94 @@ import micropip
 from pyodide.http import pyfetch
 from pyscript import display
 
-# --- Instalar Plotly de forma segura ---
+# Función async para instalar Plotly
 async def install_plotly():
     try:
         await micropip.install("plotly==5.22.0")
         import plotly.express as px
-        globals()['px'] = px  # Hacer px accesible globalmente
+        globals()['px'] = px
     except Exception as e:
-        js.console.warn(f"No se pudo instalar plotly: {e}")
+        js.console.warn(f"No se pudo instalar Plotly: {e}")
 
-# --- Inicializar la app ---
+# Inicializar app
 async def initialize_app():
     await install_plotly()
     await render_charts()
 
-# --- URLs del backend ---
 API_URL = "/data/"
 UPLOAD_URL = "/upload/"
 
-# --- Función para obtener datos ---
 async def fetch_data():
-    try:
-        response = await pyfetch(API_URL)
-        if response.status == 200:
-            return await response.json()
-    except Exception as e:
-        js.console.warn(f"Error al obtener datos: {e}")
+    response = await pyfetch(API_URL)
+    if response.status == 200:
+        return await response.json()
     return None
 
-# --- Subir archivo ---
 async def upload_file(event):
     file_input = js.document.getElementById("upload-file")
     if file_input.files.length > 0:
         file = file_input.files[0]
         form_data = js.FormData.new()
         form_data.append("file", file)
-        try:
-            response = await pyfetch(UPLOAD_URL, method="POST", body=form_data)
-            if response.status == 200:
-                await render_charts()
-                js.alert("Dataset actualizado!")
-        except Exception as e:
-            js.alert(f"Error al subir archivo: {e}")
+        response = await pyfetch(UPLOAD_URL, method="POST", body=form_data)
+        if response.status == 200:
+            await render_charts()
+            js.alert("Dataset actualizado!")
 
-# --- Renderizar gráficos ---
 async def render_charts():
-    data = await fetch_data()
-    if not data:
-        js.console.warn("No hay datos disponibles para mostrar.")
-        return
-
-    charts_div = js.document.getElementById("charts")
-    charts_div.innerHTML = ""
-    df = pd.DataFrame(data['data'])
-
-    # Valores nulos
     try:
-        nulls = pd.Series(data['nulls'])
-        fig_nulls = px.bar(x=nulls.index, y=nulls.values, title="Valores Nulos por Columna")
-        display(fig_nulls, target="charts")
+        data = await fetch_data()
+        if data:
+            charts_div = js.document.getElementById("charts")
+            charts_div.innerHTML = ""
+            df = pd.DataFrame(data['data'])
+            
+            # Gráfico 1: Valores nulos por columna
+            try:
+                nulls = pd.Series(data['nulls'])
+                fig_nulls = px.bar(
+                    x=list(nulls.index),
+                    y=list(nulls.values),
+                    title="Valores Nulos por Columna"
+                )
+                display(fig_nulls, target="charts")
+            except Exception as e:
+                js.console.warn(f"Error gráfico nulos: {e}")
+            
+            # Gráfico 2: Duplicados
+            try:
+                dup_fig = px.pie(
+                    names=['Únicos', 'Duplicados'], 
+                    values=[len(df) - data['duplicates'], data['duplicates']], 
+                    title="Proporción de Duplicados"
+                )
+                display(dup_fig, target="charts")
+            except Exception as e:
+                js.console.warn(f"Error gráfico duplicados: {e}")
+            
+            # Gráfico 3: Boxplots columnas numéricas
+            num_cols = df.select_dtypes(include='number').columns
+            for col in num_cols:
+                try:
+                    fig_box = px.box(df, y=col, title=f"Boxplot de {col}")
+                    display(fig_box, target="charts")
+                except Exception as e:
+                    js.console.warn(f"Error boxplot {col}: {e}")
+            
+            # Gráfico 4: Histograma primera columna numérica
+            if len(num_cols) > 0:
+                try:
+                    fig_hist = px.histogram(df, x=num_cols[0], title=f"Histograma de {num_cols[0]}")
+                    display(fig_hist, target="charts")
+                except Exception as e:
+                    js.console.warn(f"Error histograma {num_cols[0]}: {e}")
     except Exception as e:
-        js.console.warn(f"Error gráfico nulos: {e}")
+        js.console.error(f"Error render_charts: {e}")
 
-    # Duplicados
-    try:
-        dup_fig = px.pie(
-            names=['Únicos', 'Duplicados'], 
-            values=[len(df) - data['duplicates'], data['duplicates']], 
-            title="Proporción de Duplicados"
-        )
-        display(dup_fig, target="charts")
-    except Exception as e:
-        js.console.warn(f"Error gráfico duplicados: {e}")
-
-    # Boxplots de columnas numéricas
-    num_cols = df.select_dtypes(include='number').columns
-    for col in num_cols:
-        try:
-            fig_box = px.box(df, y=col, title=f"Boxplot de {col}")
-            display(fig_box, target="charts")
-        except Exception as e:
-            js.console.warn(f"Error boxplot {col}: {e}")
-
-    # Histograma de la primera columna numérica
-    if len(num_cols) > 0:
-        try:
-            fig_hist = px.histogram(df, x=num_cols[0], title=f"Histograma de {num_cols[0]}")
-            display(fig_hist, target="charts")
-        except Exception as e:
-            js.console.warn(f"Error histograma {num_cols[0]}: {e}")
-
-# --- Eventos ---
+# Eventos
 js.document.getElementById("upload-btn").onclick = lambda e: asyncio.ensure_future(upload_file(e))
-
-# --- Arrancar app ---
 asyncio.ensure_future(initialize_app())
-
 </py-script>
+
 </body>
 </html>

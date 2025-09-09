@@ -16,6 +16,32 @@
     <h1>Dashboard de Visualización de Dataset</h1>
     <input type="file" id="upload-file">
     <button id="upload-btn">Subir Nuevo Dataset</button>
+    <script>
+    // Subida de archivo usando JS puro
+    document.getElementById('upload-btn').onclick = async function() {
+        const fileInput = document.getElementById('upload-file');
+        if (fileInput.files.length > 0) {
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+            const response = await fetch('/upload/', {
+                method: 'POST',
+                body: formData
+            });
+            if (response.ok) {
+                alert('Dataset actualizado!');
+                // Llama a la función de PyScript para actualizar los gráficos
+                if (window.pyodide && pyodide.globals.get('render_charts')) {
+                    pyodide.runPythonAsync('await render_charts()');
+                }
+            } else {
+                alert('Error al subir el archivo');
+            }
+        } else {
+            alert('Selecciona un archivo primero');
+        }
+    };
+    </script>
     <div class="dashboard" id="charts"></div>
 
     <py-config>
@@ -51,16 +77,8 @@ async def fetch_data():
         return await response.json()
     return None
 
-async def upload_file(event):
-    file_input = js.document.getElementById("upload-file")
-    if file_input.files.length > 0:
-        file = file_input.files[0]
-        form_data = js.FormData.new()
-        form_data.append("file", file)
-        response = await pyfetch(UPLOAD_URL, method="POST", body=form_data)
-        if response.status == 200:
-            await render_charts()
-            js.alert("Dataset actualizado!")
+    # La subida de archivos ahora se maneja con JS puro
+    pass
 
 async def render_charts():
     try:
@@ -72,7 +90,8 @@ async def render_charts():
             
             # Gráfico 1: Valores nulos por columna
             nulls = pd.Series(data['nulls'])
-            fig_nulls = px.bar(x=nulls.index, y=nulls.values, title="Valores Nulos por Columna")
+            nulls_df = pd.DataFrame({'columna': nulls.index, 'nulos': nulls.values})
+            fig_nulls = px.bar(nulls_df, x='columna', y='nulos', title="Valores Nulos por Columna")
             display(fig_nulls, target="charts")
             
             # Gráfico 2: Duplicados
@@ -97,8 +116,7 @@ async def render_charts():
     except Exception as e:
         js.alert(f"Error: {str(e)}")
 
-# Evento subir archivo
-js.document.getElementById("upload-btn").onclick = lambda e: asyncio.ensure_future(upload_file(e))
+
 
 # Iniciar la app
 asyncio.ensure_future(initialize_app())

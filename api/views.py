@@ -19,13 +19,17 @@ class IndexView(View):
 # API para obtener los datos
 
 def data_api(request):
+    import json
     try:
         latest_dataset = Dataset.objects.latest("id")
         df = pd.DataFrame(latest_dataset.data)
+        data = json.loads(df.to_json(orient="records"))
+        nulls = {k: int(v) for k, v in df.isnull().sum().to_dict().items()}
+        duplicates = int(df.duplicated().sum())
         response = {
-            "data": df.to_dict(orient="records"),
-            "nulls": df.isnull().sum().to_dict(),
-            "duplicates": df.duplicated().sum()
+            "data": data,
+            "nulls": nulls,
+            "duplicates": duplicates
         }
         return JsonResponse(response)
     except Dataset.DoesNotExist:
@@ -39,6 +43,8 @@ def upload_api(request):
     if request.method == "POST" and request.FILES.get("file"):
         file = request.FILES["file"]
         df = pd.read_csv(file)
-        Dataset.objects.create(name=file.name, data=df.to_dict(orient="records"))
+        import json
+        data = json.loads(df.to_json(orient="records"))
+        Dataset.objects.create(name=file.name, data=data)
         return JsonResponse({"status": "success"})
     return JsonResponse({"error": "No file uploaded"}, status=400)

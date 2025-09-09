@@ -14,6 +14,7 @@
 </head>
 <body>
     <h1>Dashboard de Visualización de Dataset</h1>
+    <h2 id="dataset-title" style="color:#2a4d7a; font-size:1.3em; margin-top:0.2em;"></h2>
     <input type="file" id="upload-file">
     <button id="upload-btn">Subir Nuevo Dataset</button>
     <script>
@@ -29,11 +30,10 @@
                 body: formData
             });
             if (response.ok) {
-                alert('Dataset actualizado!');
-                // Llama a la función de PyScript para actualizar los gráficos
-                if (window.pyodide && pyodide.globals.get('render_charts')) {
-                    pyodide.runPythonAsync('await render_charts()');
-                }
+                // Espera 1 segundo antes de recargar para asegurar que el backend procese el archivo
+                setTimeout(() => {
+                    location.reload(true);
+                }, 1000);
             } else {
                 alert('Error al subir el archivo');
             }
@@ -45,10 +45,10 @@
     <div class="dashboard" id="charts"></div>
 
     <py-config>
-        packages = ["pandas", "matplotlib", "requests", "micropip"]  <!-- Removido "pyarrow" para evitar el error -->
+        packages = ["pandas", "matplotlib", "requests", "micropip"]  # Removido "pyarrow" para evitar el error
     </py-config>
 
-    <py-script>
+<py-script>
 import asyncio
 import js
 import pandas as pd
@@ -58,7 +58,7 @@ from pyscript import display
 
 # Función async para instalar dependencias e importar plotly.express
 async def install_dependencies():
-    await micropip.install('plotly==5.22.0')  <!-- Solo plotly, sin pyarrow -->
+    await micropip.install('plotly==5.22.0')  # Solo plotly, sin pyarrow
     import plotly.express as px
     globals()['px'] = px  # Hacer px disponible globalmente
 
@@ -83,36 +83,48 @@ async def fetch_data():
 async def render_charts():
     try:
         data = await fetch_data()
-        if data:
-            charts_div = js.document.getElementById("charts")
-            charts_div.innerHTML = ""
-            df = pd.DataFrame(data['data'])
-            
-            # Gráfico 1: Valores nulos por columna
-            nulls = pd.Series(data['nulls'])
-            nulls_df = pd.DataFrame({'columna': nulls.index, 'nulos': nulls.values})
-            fig_nulls = px.bar(nulls_df, x='columna', y='nulos', title="Valores Nulos por Columna")
-            display(fig_nulls, target="charts")
-            
-            # Gráfico 2: Duplicados
-            dup_fig = px.pie(
-                names=['Únicos', 'Duplicados'], 
-                values=[len(df) - data['duplicates'], data['duplicates']], 
-                title="Proporción de Duplicados"
-            )
-            display(dup_fig, target="charts")
-            
-            # Gráfico 3: Boxplot para cada columna numérica
-            num_cols = df.select_dtypes(include='number').columns
-            if len(num_cols) > 0:
-                for col in num_cols:
-                    fig_box = px.box(df, y=col, title=f"Boxplot de {col}")
-                    display(fig_box, target="charts")
-            
-            # Gráfico 4: Histograma de la primera columna numérica
-            if len(num_cols) > 0:
-                fig_hist = px.histogram(df, x=num_cols[0], title=f"Histograma de {num_cols[0]}")
-                display(fig_hist, target="charts")
+        charts_div = js.document.getElementById("charts")
+        charts_div.innerHTML = ""
+        dataset_title = js.document.getElementById("dataset-title")
+        # Si no hay datos, mostrar mensaje amigable y limpiar título
+        if not data or not data['data'] or len(data['data']) == 0:
+            charts_div.innerHTML = '<div style="grid-column: 1/-1; text-align:center; color: #888; font-size: 1.2em;">No hay datos cargados. Por favor, sube un dataset para ver las gráficas.</div>'
+            dataset_title.innerText = ''
+            return
+        # Mostrar el nombre del dataset
+        dataset_title.innerText = data.get('name', '') or ''
+        df = pd.DataFrame(data['data'])
+        # Gráfico 1: Valores nulos por columna
+        nulls = pd.Series(data['nulls'])
+        nulls_df = pd.DataFrame({'columna': nulls.index, 'nulos': nulls.values})
+        fig_nulls = px.bar(
+            nulls_df,
+            x='columna',
+            y='nulos',
+            color='columna',  # Para que cada barra tenga un color distinto
+            color_discrete_sequence=px.colors.qualitative.Set3,  # Paleta de colores amplia
+            title="Valores Nulos por Columna",
+            labels={'columna': 'Columna', 'nulos': 'Cantidad de nulos'}
+        )
+        fig_nulls.update_layout(legend_title_text='Columna')  # Título de la leyenda
+        display(fig_nulls, target="charts")
+        # Gráfico 2: Duplicados
+        dup_fig = px.pie(
+            names=['Únicos', 'Duplicados'], 
+            values=[len(df) - data['duplicates'], data['duplicates']], 
+            title="Proporción de Duplicados"
+        )
+        display(dup_fig, target="charts")
+        # Gráfico 3: Boxplot para cada columna numérica
+        num_cols = df.select_dtypes(include='number').columns
+        if len(num_cols) > 0:
+            for col in num_cols:
+                fig_box = px.box(df, y=col, title=f"Boxplot de {col}")
+                display(fig_box, target="charts")
+        # Gráfico 4: Histograma de la primera columna numérica
+        if len(num_cols) > 0:
+            fig_hist = px.histogram(df, x=num_cols[0], title=f"Histograma de {num_cols[0]}")
+            display(fig_hist, target="charts")
     except Exception as e:
         js.alert(f"Error: {str(e)}")
 
@@ -120,6 +132,6 @@ async def render_charts():
 
 # Iniciar la app
 asyncio.ensure_future(initialize_app())
-    </py-script>
+</py-script>
 </body>
 </html>

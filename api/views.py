@@ -29,12 +29,13 @@ def data_api(request):
         response = {
             "data": data,
             "nulls": nulls,
-            "duplicates": duplicates
+            "duplicates": duplicates,
+            "name": latest_dataset.name
         }
         return JsonResponse(response)
     except Dataset.DoesNotExist:
         # Devuelve estructura vacía para que PyScript no rompa
-        return JsonResponse({"data": [], "nulls": {}, "duplicates": 0})
+        return JsonResponse({"data": [], "nulls": {}, "duplicates": 0, "name": None})
 
 
 # API para subir CSV

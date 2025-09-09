@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard de Análisis de Dataset</title>
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.8.1/core.css">
+    <script type="module" src="https://pyscript.net/releases/2024.8.1/core.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
+        .chart { border: 1px solid #ccc; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Dashboard de Visualización de Dataset</h1>
+    <h2 id="dataset-title" style="color:#2a4d7a; font-size:1.3em; margin-top:0.2em;"></h2>
+    <input type="file" id="upload-file">
+    <button id="upload-btn">Subir Nuevo Dataset</button>
+    <script>
+    // Subida de archivo usando JS puro
+    document.getElementById('upload-btn').onclick = async function() {
+        const fileInput = document.getElementById('upload-file');
+        if (fileInput.files.length > 0) {
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+            const response = await fetch('/upload/', {
+                method: 'POST',
+                body: formData
+            });
+            if (response.ok) {
+                // Recarga la página y fuerza limpieza de caché
+                location.reload(true);
+            } else {
+                alert('Error al subir el archivo');
+            }
+        } else {
+            alert('Selecciona un archivo primero');
+        }
+    };
+    </script>
+    <div class="dashboard" id="charts"></div>
+
+    <py-config>
+        packages = ["pandas", "matplotlib", "requests", "micropip"]  # Removido "pyarrow" para evitar el error
+    </py-config>
+
+<py-script>
+import asyncio
+import js
+import pandas as pd
+import micropip
+from pyodide.http import pyfetch
+from pyscript import display
+
+# Función async para instalar dependencias e importar plotly.express
+async def install_dependencies():
+    await micropip.install('plotly==5.22.0')  # Solo plotly, sin pyarrow
+    import plotly.express as px
+    globals()['px'] = px  # Hacer px disponible globalmente
+
+# Función para inicializar la app
+async def initialize_app():
+    await install_dependencies()  # Espera a que se instalen las dependencias
+    await render_charts()  # Renderiza los gráficos después de la instalación
+
+# URLs del backend
+API_URL = "/data/"
+UPLOAD_URL = "/upload/"
+
+async def fetch_data():
+    response = await pyfetch(API_URL)
+    if response.status == 200:
+        return await response.json()
+    return None
+
+    # La subida de archivos ahora se maneja con JS puro
+    pass
+
+async def render_charts():
+    try:
+        data = await fetch_data()
+        charts_div = js.document.getElementById("charts")
+        charts_div.innerHTML = ""
+        dataset_title = js.document.getElementById("dataset-title")
+        # Si no hay datos, mostrar mensaje amigable y limpiar título
+        if not data or not data['data'] or len(data['data']) == 0:
+            charts_div.innerHTML = '<div style="grid-column: 1/-1; text-align:center; color: #888; font-size: 1.2em;">No hay datos cargados. Por favor, sube un dataset para ver las gráficas.</div>'
+            dataset_title.innerText = ''
+            return
+        # Mostrar el nombre del dataset
+        dataset_title.innerText = data.get('name', '') or ''
+        df = pd.DataFrame(data['data'])
+        # Gráfico 1: Valores nulos por columna
+        nulls = pd.Series(data['nulls'])
+        nulls_df = pd.DataFrame({'columna': nulls.index, 'nulos': nulls.values})
+        fig_nulls = px.bar(nulls_df, x='columna', y='nulos', title="Valores Nulos por Columna")
+        display(fig_nulls, target="charts")
+        # Gráfico 2: Duplicados
+        dup_fig = px.pie(
+            names=['Únicos', 'Duplicados'], 
+            values=[len(df) - data['duplicates'], data['duplicates']], 
+            title="Proporción de Duplicados"
+        )
+        display(dup_fig, target="charts")
+        # Gráfico 3: Boxplot para cada columna numérica
+        num_cols = df.select_dtypes(include='number').columns
+        if len(num_cols) > 0:
+            for col in num_cols:
+                fig_box = px.box(df, y=col, title=f"Boxplot de {col}")
+                display(fig_box, target="charts")
+        # Gráfico 4: Histograma de la primera columna numérica
+        if len(num_cols) > 0:
+            fig_hist = px.histogram(df, x=num_cols[0], title=f"Histograma de {num_cols[0]}")
+            display(fig_hist, target="charts")
+    except Exception as e:
+        js.alert(f"Error: {str(e)}")
+
+
+
+# Iniciar la app
+asyncio.ensure_future(initialize_app())
+</py-script>
+</body>
+</html>
